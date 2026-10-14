@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>URL Shortener</title>
+  <style>
+    :root {
+      --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6a66;
+      --line: #e3e1db; --accent: #3b5bdb; --accent-ink: #ffffff;
+      --ok-bg: #edf7ee; --ok-line: #b7dfba; --err-bg: #fdf0ef; --err-line: #f1c0bb;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #161615; --panel: #1f1f1d; --ink: #ecebe7; --muted: #9c9a94;
+        --line: #33322f; --accent: #748ffc; --accent-ink: #10131f;
+        --ok-bg: #18261a; --ok-line: #2f5634; --err-bg: #2a1716; --err-line: #5e2f2b;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+      display: flex; justify-content: center; padding: 48px 16px;
+    }
+    main { width: 100%; max-width: 620px; }
+    h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.02em; }
+    .lede { color: var(--muted); margin: 0 0 28px; }
+    form, .result {
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: 12px; padding: 20px;
+    }
+    label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+    input, select {
+      width: 100%; font: inherit; color: inherit; background: var(--bg);
+      border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+    }
+    input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+    @media (max-width: 520px) { .row { grid-template-columns: 1fr; } }
+    .hint { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    button {
+      font: inherit; font-weight: 600; cursor: pointer; border: 0; border-radius: 8px;
+      padding: 11px 18px; background: var(--accent); color: var(--accent-ink);
+    }
+    button.secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+    .submit { margin-top: 18px; width: 100%; }
+    .result { margin-top: 16px; display: none; }
+    .result.ok { display: block; background: var(--ok-bg); border-color: var(--ok-line); }
+    .result.err { display: block; background: var(--err-bg); border-color: var(--err-line); }
+    .short { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .short a { font-size: 20px; font-weight: 600; color: var(--accent); word-break: break-all; flex: 1; }
+    .meta { font-size: 14px; color: var(--muted); margin: 10px 0 0; word-break: break-all; }
+    .meta a { color: var(--accent); }
+    code { font-size: 13px; background: var(--bg); padding: 2px 6px; border-radius: 4px; }
+    footer { margin-top: 28px; font-size: 14px; color: var(--muted); }
+    footer a { color: var(--accent); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>URL Shortener</h1>
+  <p class="lede">Paste a long link and get a short one you can share.</p>
+
+  <form id="form">
+    <label for="url">Long URL</label>
+    <input id="url" name="url" type="text" placeholder="https://example.com/a/very/long/link" required autofocus>
+    <div class="row">
+      <div>
+        <label for="alias">Custom alias <span class="hint">(optional)</span></label>
+        <input id="alias" name="alias" type="text" placeholder="my-link" maxlength="30">
+      </div>
+      <div>
+        <label for="expiry">Expires</label>
+        <select id="expiry" name="expiry">
+          <option value="">Never</option>
+          <option value="3600">In 1 hour</option>
+          <option value="86400">In 1 day</option>
+          <option value="604800">In 7 days</option>
+          <option value="2592000">In 30 days</option>
+        </select>
+      </div>
+    </div>
+    <button class="submit" type="submit">Shorten</button>
+  </form>
+
+  <section id="result" class="result" aria-live="polite"></section>
+
+  <footer>API reference: <a href="/docs">/docs</a> · Health: <a href="/health">/health</a></footer>
+</main>
+
+<script>
+  const form = document.getElementById("form");
+  const result = document.getElementById("result");
+
+  function show(kind, html) {
+    result.className = "result " + kind;
+    result.innerHTML = html;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const body = { url: form.url.value };
+    if (form.alias.value.trim()) body.custom_alias = form.alias.value.trim();
+    if (form.expiry.value) {
+      body.expires_at = new Date(Date.now() + Number(form.expiry.value) * 1000).toISOString();
+    }
+
+    try {
+      const res = await fetch("/api/shorten", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = Array.isArray(data.detail) ? data.detail.map(d => d.msg).join("; ") : data.detail;
+        show("err", "<strong>Couldn't shorten that.</strong> " + escapeHtml(msg));
+        return;
+      }
+      const expires = data.expires_at ? new Date(data.expires_at + "Z").toLocaleString() : "never";
+      show("ok", `
+        <div class="short">
+          <a href="${escapeHtml(data.short_url)}" target="_blank" rel="noopener">${escapeHtml(data.short_url)}</a>
+          <button type="button" class="secondary" id="copy">Copy</button>
+        </div>
+        <p class="meta">Points to ${escapeHtml(data.original_url)} · expires ${escapeHtml(expires)}</p>
+        <p class="meta">Stats: <a href="/api/urls/${encodeURIComponent(data.short_code)}/stats">/api/urls/${escapeHtml(data.short_code)}/stats</a></p>
+        <p class="meta">Delete token (save it, shown once): <code>${escapeHtml(data.delete_token)}</code></p>`);
+      document.getElementById("copy").addEventListener("click", async (e) => {
+        try { await navigator.clipboard.writeText(data.short_url); e.target.textContent = "Copied"; }
+        catch { e.target.textContent = "Copy failed"; }
+      });
+      form.alias.value = "";
+    } catch (err) {
+      show("err", "<strong>Network error.</strong> Is the server running?");
+    }
+  });
+</script>
+</body>
+</html>

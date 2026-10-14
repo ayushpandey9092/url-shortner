@@ -1,0 +1,37 @@
+# Default: the app with a SQLite database on a named volume.
+#   docker compose up --build
+#
+# With PostgreSQL instead:
+#   docker compose --profile postgres up --build
+# and set DATABASE_URL below to the postgres line.
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      BASE_URL: http://localhost:8000
+      DATABASE_URL: sqlite:////app/data/urls.db
+      # DATABASE_URL: postgresql+psycopg://shortener:shortener@db:5432/shortener
+    volumes:
+      - url-data:/app/data
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_USER: shortener
+      POSTGRES_PASSWORD: shortener
+      POSTGRES_DB: shortener
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shortener"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  url-data:
+  pg-data:

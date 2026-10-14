@@ -1,0 +1,26 @@
+[project]
+name = "url-shortener"
+version = "1.0.0"
+description = "A URL shortening service built with FastAPI and SQLAlchemy."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = [
+    # Raised inside Starlette's TestClient, not by this project.
+    "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["B008"]  # FastAPI's Depends(...) in defaults is the intended pattern
+
+[tool.ruff.lint.per-file-ignores]
+"app/validators.py" = ["E501"]
