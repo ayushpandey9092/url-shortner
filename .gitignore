@@ -23,3 +23,7 @@ data/
 .vscode/
 .idea/
 .DS_Store
+
+# Maven build output for the Java project
+java/target/
+java/data/

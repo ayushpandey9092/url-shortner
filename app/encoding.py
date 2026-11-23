@@ -28,25 +28,44 @@ _INDEX = {char: i for i, char in enumerate(ALPHABET)}
 
 
 def base62_encode(number: int, length: int) -> str:
-    """Encode a non-negative integer as Base62, left-padded to `length`."""
+    """Encode a non-negative integer as Base62, left-padded to `length`.
+
+    Example: base62_encode(25, 3) -> "00p"
+    (25 has one Base62 digit, 'p', and is padded with two '0's to reach length 3.)
+    """
+    # Negative numbers have no Base62 digits, so reject them up front.
     if number < 0:
         raise ValueError("number must be non-negative")
+    # Digits are produced least significant first, so collect them here.
     chars = []
     while number:
+        # Peel off the lowest digit: 25 -> quotient 0, remainder 25 ('p').
         number, remainder = divmod(number, BASE)
         chars.append(ALPHABET[remainder])
+    # Reverse into the usual left-to-right order. Zero produces no digits,
+    # so fall back to "0" for it.
     encoded = "".join(reversed(chars)) or ALPHABET[0]
+    # The result must fit in `length` characters, otherwise it can't be padded.
     if len(encoded) > length:
         raise ValueError(f"number does not fit in {length} Base62 characters")
+    # Pad on the left with '0' so every code has the same width.
     return encoded.rjust(length, ALPHABET[0])
 
 
 def base62_decode(code: str) -> int:
-    """Decode a Base62 string back to an integer."""
+    """Decode a Base62 string back to an integer.
+
+    Example: base62_decode("00p") -> 25
+    (each character adds its value, shifting the running total one base-62 place left.)
+    """
+    # Start from zero and fold in one character at a time, left to right.
     number = 0
     for char in code:
+        # Reject anything outside the alphabet, such as '-' or a space.
         if char not in _INDEX:
             raise ValueError(f"invalid Base62 character: {char!r}")
+        # Shift the total one base-62 place left, then add this digit's value.
+        # "00p": 0 -> 0*62+0 = 0 -> 0*62+0 = 0 -> 0*62+25 = 25.
         number = number * BASE + _INDEX[char]
     return number
 

@@ -1,0 +1,22 @@
+# Run the Java app with a SQLite database kept in a Docker volume.
+#   cd java
+#   docker compose up --build
+#
+# Then open http://localhost:8080 in a browser.
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      # Short links are built from this address, so it must match how people reach the app.
+      APP_BASE_URL: http://localhost:8080
+      # Spring reads SPRING_DATASOURCE_URL in place of spring.datasource.url.
+      SPRING_DATASOURCE_URL: jdbc:sqlite:/app/data/urls.db
+    volumes:
+      - url-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  url-data:
